@@ -1,7 +1,4 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: node.js CIconst express = require('express');
+const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 
@@ -33,7 +30,49 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('text', data);
   });
 
-  // --- [핵심 수정] Undo: 한 획(세트) 전체 삭제 ---
+  // --- Undo: 한 획(세트) 전체 삭제 ---
+  socket.on('undo', () => {
+    let lastItem = null;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].id === socket.id) {
+        lastItem = history[i];
+        break;
+      }
+    }
+
+    if (lastItem) {
+      const targetStrokeId = lastItem.strokeId;
+
+      if (targetStrokeId) {
+        // [선 그리기] 같은 세트 번호 가진 애들 싹 다 삭제
+        history = history.filter(item => item.strokeId !== targetStrokeId);
+      } else {
+        // [사진/텍스트] 단일 항목 삭제
+        const index = history.indexOf(lastItem);
+        if (index > -1) history.splice(index, 1);
+      }
+
+      console.log(`↩️ Undo 완료!`);
+      
+      // 화면 갱신
+      io.emit('clear');
+      io.emit('history', history);
+    }
+  });
+
+  socket.on('clear', () => {
+    history = [];
+    io.emit('clear');
+  });
+});
+
+// ▼▼▼ 여기가 Render 배포의 핵심입니다! ▼▼▼
+// Render가 주는 포트(process.env.PORT)를 쓰거나, 없으면 3000을 씁니다.
+const PORT = process.env.PORT || 3000;
+
+http.listen(PORT, () => {
+  console.log(`서버 준비 완료! 포트 번호: ${PORT}`);
+});
   socket.on('undo', () => {
     // 1. 내 기록 중 가장 마지막 것 찾기
     let lastItem = null;
