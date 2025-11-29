@@ -108,7 +108,6 @@ http.listen(PORT, () => {
     history = [];
     io.emit('clear');
   });
-});
 
 http.listen(3000, () => {
   console.log('서버 준비 완료 (Undo 그룹 삭제 적용)');
