@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>최강 스케치북</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"></script>
+
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #e5e5e5; }
+    #viewport { width: 100%; height: 100%; overflow: hidden; touch-action: none; cursor: crosshair; }
+    canvas { display: block; background-color: white; box-shadow: 0 0 50px rgba(0,0,0,0.1); transform-origin: 0 0; }
+    .toolbar {
+      position: fixed; bottom: 0; left: 0; width: 100%; box-sizing: border-box;
+      display: flex; align-items: center; justify-content: flex-start;
+      background: white; border-top: 1px solid #eee; border-radius: 20px 20px 0 0;
+      box-shadow: 0 -5px 20px rgba(0,0,0,0.05); z-index: 100;
+      overflow-x: auto; white-space: nowrap; padding: 15px 20px; gap: 15px;
+      padding-bottom: max(15px, env(safe-area-inset-bottom));
+    }
+    .toolbar::-webkit-scrollbar { display: none; }
+    .color-btn { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; border: 2px solid #eee; cursor: pointer; }
+    .color-btn.active { transform: scale(1.1); border-color: #555; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .tool-btn { flex-shrink: 0; background: #f5f5f5; border: none; border-radius: 12px; width: 40px; height: 40px; font-size: 20px; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .tool-btn.active { background: #333; color: white; }
+    .kakao-btn { background-color: #FEE500; color: #3c1e1e; }
+    .divider { flex-shrink: 0; width: 1px; height: 24px; background: #eee; margin: 0 5px; }
+    #textInput { position: fixed; z-index: 1000; display: none; background: transparent; border: 2px dashed #333; font-size: 20px; padding: 5px; color: #333; outline: none; min-width: 100px; }
+    /* 모달 스타일 생략 (이전과 동일) */
+    #imgModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
+    #previewContainer { position: relative; max-width: 90%; max-height: 60%; border: 2px solid white; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #333; }
+    #previewImg { max-width: 100%; max-height: 100%; object-fit: contain; }
+    #modalControls { margin-top: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; align-items: center; background: white; padding: 20px; border-radius: 15px; }
+    input[type=range] { width: 100%; } .modal-btns { display: flex; gap: 10px; width: 100%; } .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; } .btn-confirm { background: #007aff; color: white; } .btn-cancel { background: #eee; color: #333; }
+  </style>
+</head>
+<body>
+  <div id="viewport"><canvas id="myCanvas"></canvas></div>
+  <input type="text" id="textInput" placeholder="입력 후 엔터">
+  <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="openImageModal(this)">
+  
+  <div id="imgModal">
+    <div id="previewContainer"><img id="previewImg" src=""></div>
+    <div id="modalControls">
+      <div style="width:100%; display:flex; justify-content:space-between; font-size:14px; color:#555;"><span>작게</span><span>크게</span></div>
+      <input type="range" id="sizeSlider" min="50" max="1000" value="300">
+      <div class="modal-btns">
+        <button class="modal-btn btn-cancel" onclick="closeModal()">취소</button>
+        <button class="modal-btn btn-confirm" onclick="confirmUpload()">이대로 올리기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="color-btn active" style="background:#222" onclick="setColor('#222', this)"></div>
+    <div class="color-btn" style="background:#ff3b30" onclick="setColor('#ff3b30', this)"></div>
+    <div class="color-btn" style="background:#007aff" onclick="setColor('#007aff', this)"></div>
+    <div class="divider"></div>
+    <button class="tool-btn material-icons-round" onclick="toggleWidth(this)">line_weight</button>
+    <button class="tool-btn material-icons-round" id="eraserBtn" onclick="setMode('eraser', this)">auto_fix_normal</button>
+    <div class="divider"></div>
+    <button class="tool-btn material-icons-round" id="textBtn" onclick="setMode('text', this)">title</button>
+    <button class="tool-btn material-icons-round" onclick="document.getElementById('fileInput').click()">add_photo_alternate</button>
+    <div class="divider"></div>
+    <button class="tool-btn material-icons-round" onclick="undoLast()">undo</button>
+    <button class="tool-btn material-icons-round kakao-btn" onclick="shareKakao()">chat_bubble</button>
+    <button class="tool-btn material-icons-round" onclick="saveImage()">save_alt</button>
+    <button class="tool-btn material-icons-round" style="color:#ff3b30" onclick="clearAll()">delete</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    try { Kakao.init('4d45c01b3cb3e2682248068b8bf568b5'); } catch(e) {} 
+
+    const socket = io();
+    const viewport = document.getElementById('viewport');
+    const canvas = document.getElementById('myCanvas');
+    const ctx = canvas.getContext('2d');
+    const textInput = document.getElementById('textInput');
+    const imgModal = document.getElementById('imgModal');
+    const previewImg = document.getElementById('previewImg');
+    const sizeSlider = document.getElementById('sizeSlider');
+
+    const VIRTUAL_WIDTH = 3000, VIRTUAL_HEIGHT = 3000;
+    canvas.width = VIRTUAL_WIDTH; canvas.height = VIRTUAL_HEIGHT;
+
+    let current = { color: '#222', width: 3, mode: 'draw' };
+    let isDown = false, isDrawing = false, startPos = {x:0,y:0};
+    let scale = 1, panX = (window.innerWidth-VIRTUAL_WIDTH)/2, panY = (window.innerHeight-VIRTUAL_HEIGHT)/2;
+    let isSpacePressed = false, isMousePanning = false, panStartMouse = null;
+    let tempImgData = null;
+    let currentStrokeId = null; // [핵심] 현재 그리는 획의 고유 번호
+
+    updateTransform();
+    function updateTransform() { canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`; }
+    function getPos(clientX, clientY) { return { x: (clientX - panX) / scale, y: (clientY - panY) / scale }; }
+
+    function drawLine(x0, y0, x1, y1, style, emit) {
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+      ctx.strokeStyle = style.color; ctx.lineWidth = style.width; ctx.lineCap = 'round';
+      ctx.globalCompositeOperation = style.mode === 'eraser' ? 'destination-out' : 'source-over';
+      ctx.stroke(); ctx.closePath();
+      // strokeId도 같이 보냄
+      if (emit) socket.emit('drawing', { x0, y0, x1, y1, color: style.color, width: style.width, mode: style.mode, strokeId: currentStrokeId });
+    }
+    
+    function drawDot(pos, style, emit) {
+      ctx.beginPath(); ctx.arc(pos.x, pos.y, style.width / 2, 0, Math.PI * 2);
+      ctx.fillStyle = style.color; ctx.globalCompositeOperation = style.mode === 'eraser' ? 'destination-out' : 'source-over';
+      ctx.fill(); ctx.closePath();
+      if (emit) socket.emit('drawing', { x0: pos.x, y0: pos.y, x1: pos.x, y1: pos.y, color: style.color, width: style.width, mode: style.mode, strokeId: currentStrokeId });
+    }
+
+    function drawImageObj(data, emit) {
+      const img = new Image();
+      img.onload = () => { ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(img, data.x, data.y, data.w, data.h); };
+      img.src = data.src;
+      if (emit) socket.emit('image', data);
+    }
+    function drawTextObj(data, emit) {
+      ctx.globalCompositeOperation = 'source-over'; ctx.font = "bold 40px sans-serif"; ctx.fillStyle = data.color; ctx.fillText(data.text, data.x, data.y);
+      if (emit) socket.emit('text', data);
+    }
+
+    // 모달 및 이미지 로직
+    function openImageModal(input) {
+      const file = input.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => { tempImgData = e.target.result; previewImg.src = tempImgData; imgModal.style.display = 'flex'; sizeSlider.value = 300; sizeSlider.max = Math.min(window.innerWidth, 1000); updatePreview(); };
+      reader.readAsDataURL(file); input.value = '';
+    }
+    sizeSlider.oninput = updatePreview;
+    function updatePreview() { previewImg.style.width = sizeSlider.value + 'px'; }
+    function closeModal() { imgModal.style.display = 'none'; tempImgData = null; }
+    function confirmUpload() {
+      if (!tempImgData) return;
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1000; let dw=img.width, dh=img.height;
+        if (dw > MAX) { dh *= MAX/dw; dw = MAX; }
+        const tCan = document.createElement('canvas'); tCan.width = dw; tCan.height = dh;
+        tCan.getContext('2d').drawImage(img, 0, 0, dw, dh);
+        const compressed = tCan.toDataURL('image/jpeg', 0.7);
+        const userW = parseInt(sizeSlider.value); const userH = userW * (img.height/img.width);
+        const center = getPos(window.innerWidth/2, window.innerHeight/2);
+        drawImageObj({ src: compressed, x: center.x-userW/2, y: center.y-userH/2, w: userW, h: userH }, true);
+        closeModal();
+      };
+      img.src = tempImgData;
+    }
+
+    // 텍스트 로직
+    function handleCanvasClick(e) {
+      if (current.mode !== 'text') return;
+      if (textInput.style.display === 'block') { finishText(getPos(e.clientX, e.clientY)); return; }
+      const p = getPos(e.clientX, e.clientY);
+      textInput.style.display = 'block'; textInput.style.left = e.clientX+'px'; textInput.style.top = e.clientY+'px';
+      textInput.style.color = current.color; textInput.value = ''; setTimeout(() => textInput.focus(), 10);
+      textInput.onkeyup = (key) => { if (key.key === 'Enter') finishText(p); };
+      textInput.onblur = () => { finishText(p); };
+    }
+    function finishText(pos) {
+      if (textInput.value.trim() !== '') drawTextObj({ text: textInput.value, x: pos.x, y: pos.y, color: current.color }, true);
+      textInput.style.display = 'none'; textInput.value = ''; setMode('draw', document.querySelector('.color-btn.active'));
+    }
+
+    // 입력 이벤트
+    window.addEventListener('keydown', (e) => { if (e.code === 'Space') { isSpacePressed = true; viewport.style.cursor = 'grab'; } });
+    window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isSpacePressed = false; viewport.style.cursor = 'crosshair'; isMousePanning = false; } });
+
+    viewport.addEventListener('mousedown', (e) => {
+      if (current.mode === 'text') { handleCanvasClick(e); return; }
+      if (isSpacePressed || e.button === 1) { isMousePanning = true; panStartMouse = { x: e.clientX, y: e.clientY }; e.preventDefault(); }
+      else { 
+        isDown = true; isDrawing = false; 
+        const p = getPos(e.clientX, e.clientY); lastCenter = p; startPos = p; 
+        currentStrokeId = Date.now() + Math.random(); // [핵심] 누를 때마다 새로운 세트 번호 생성
+      }
+    });
+    viewport.addEventListener('mousemove', (e) => {
+      if (current.mode === 'text') return;
+      if (isMousePanning) { panX += e.clientX - panStartMouse.x; panY += e.clientY - panStartMouse.y; panStartMouse = { x: e.clientX, y: e.clientY }; updateTransform(); }
+      else if (isDown) {
+        const p = getPos(e.clientX, e.clientY);
+        if (!isDrawing) { if (Math.hypot(p.x - startPos.x, p.y - startPos.y) > 3) isDrawing = true; }
+        if (isDrawing) drawLine(lastCenter.x, lastCenter.y, p.x, p.y, current, true);
+        lastCenter = p;
+      }
+    });
+    viewport.addEventListener('mouseup', () => { if (current.mode === 'text') return; if (isDown && !isDrawing) drawDot(startPos, current, true); isDown = false; isDrawing = false; isMousePanning = false; });
+
+    let lastCenter = null, startDist = 0, startScale = 1, startPanX = 0, startPanY = 0;
+    viewport.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1 && current.mode === 'text') { handleCanvasClick(e.touches[0]); e.preventDefault(); return; }
+      if (e.touches.length === 2) {
+        isDown = false; isDrawing = false;
+        startDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        startScale = scale; startPanX = panX; startPanY = panY;
+        lastCenter = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
+      } else if (e.touches.length === 1) { 
+        isDown = true; isDrawing = false; 
+        const p = getPos(e.touches[0].clientX, e.touches[0].clientY); lastCenter = p; startPos = p;
+        currentStrokeId = Date.now() + Math.random(); // [핵심] 터치할 때도 세트 번호 생성
+      }
+    }, { passive: false });
+    viewport.addEventListener('touchmove', (e) => {
+      if (current.mode === 'text') return;
+      if (e.touches.length === 2 && lastCenter) {
+        const cx = (e.touches[0].clientX + e.touches[1].clientX)/2, cy = (e.touches[0].clientY + e.touches[1].clientY)/2;
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        if (startDist > 0) {
+          scale = Math.min(Math.max(0.1, startScale * (dist/startDist)), 5);
+          const wx = (lastCenter.x - startPanX)/startScale, wy = (lastCenter.y - startPanY)/startScale;
+          panX = cx - wx*scale; panY = cy - wy*scale;
+        }
+        updateTransform();
+      } else if (isDown && e.touches.length === 1) {
+        const p = getPos(e.touches[0].clientX, e.touches[0].clientY);
+        if (!isDrawing) { if (Math.hypot(p.x - startPos.x, p.y - startPos.y) > 5) isDrawing = true; if(isDrawing) drawLine(startPos.x, startPos.y, p.x, p.y, current, true); }
+        if (isDrawing) drawLine(lastCenter.x, lastCenter.y, p.x, p.y, current, true);
+        lastCenter = p;
+      }
+    }, { passive: false });
+    viewport.addEventListener('touchend', (e) => { if (current.mode === 'text') return; if (isDown && !isDrawing && e.touches.length === 0) drawDot(startPos, current, true); isDown = false; isDrawing = false; lastCenter = null; });
+    
+    viewport.addEventListener('wheel', (e) => { e.preventDefault(); const newScale = Math.min(Math.max(0.1, scale + (scale * -e.deltaY * 0.0005)), 5); const mx = (e.clientX - panX)/scale, my = (e.clientY - panY)/scale; scale = newScale; panX = e.clientX - mx*scale; panY = e.clientY - my*scale; updateTransform(); }, { passive: false });
+
+    // 소켓 수신
+    socket.on('drawing', (d) => { if (d.x0===d.x1 && d.y0===d.y1) drawDot({x:d.x0,y:d.y0},d,false); else drawLine(d.x0,d.y0,d.x1,d.y1,d,false); });
+    socket.on('image', (d) => drawImageObj(d, false));
+    socket.on('text', (d) => drawTextObj(d, false));
+    socket.on('history', (h) => h.forEach(d => {
+      if (d.type === 'image') drawImageObj(d, false);
+      else if (d.type === 'text') drawTextObj(d, false);
+      else { if (d.x0===d.x1 && d.y0===d.y1) drawDot({x:d.x0,y:d.y0},d,false); else drawLine(d.x0,d.y0,d.x1,d.y1,d,false); }
+    }));
+    socket.on('clear', () => ctx.clearRect(0,0,canvas.width,canvas.height));
+
+    // UI 함수
+    function setMode(m,b) { current.mode = m; document.querySelectorAll('.tool-btn').forEach(x=>x.classList.remove('active')); if(b) b.classList.add('active'); if(m==='eraser') document.querySelectorAll('.color-btn').forEach(x=>x.classList.remove('active')); if(m!=='text') textInput.style.display='none'; }
+    function setColor(c,b) { current.color=c; setMode('draw',null); document.querySelectorAll('.color-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); document.getElementById('eraserBtn').classList.remove('active'); document.getElementById('textBtn').classList.remove('active'); }
+    function toggleWidth(el) { current.width = (current.width===3)?10:3; el.style.fontWeight = (current.width===10)?'bold':'normal'; }
+    function clearAll() { socket.emit('clear'); }
+    function saveImage() { const a=document.createElement('a'); a.download='sketch.png'; a.href=canvas.toDataURL(); a.click(); }
+    function shareKakao() { if (!Kakao.isInitialized()) { alert('키 오류'); return; } Kakao.Share.sendDefault({ objectType: 'feed', content: { title: '그림판', description: '접속!', imageUrl: '', link: { mobileWebUrl: location.href, webUrl: location.href } }, buttons: [{ title: '가기', link: { mobileWebUrl: location.href, webUrl: location.href } }] }); }
+    function undoLast() { socket.emit('undo'); }
+  </script>
+</body>
+</html>
