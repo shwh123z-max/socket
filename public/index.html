@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>실시간 스케치북</title>
+  <title>실시간 스케치북 + AI 채팅</title>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"></script>
 
@@ -11,6 +11,8 @@
     body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #e5e5e5; }
     #viewport { width: 100%; height: 100%; overflow: hidden; touch-action: none; cursor: crosshair; }
     canvas { display: block; background-color: white; box-shadow: 0 0 50px rgba(0,0,0,0.1); transform-origin: 0 0; }
+    
+    /* 툴바 스타일 */
     .toolbar {
       position: fixed; bottom: 0; left: 0; width: 100%; box-sizing: border-box;
       display: flex; align-items: center; justify-content: flex-start;
@@ -26,20 +28,74 @@
     .tool-btn.active { background: #333; color: white; }
     .kakao-btn { background-color: #FEE500; color: #3c1e1e; }
     .divider { flex-shrink: 0; width: 1px; height: 24px; background: #eee; margin: 0 5px; }
+    
+    /* 텍스트 입력창 */
     #textInput { position: fixed; z-index: 1000; display: none; background: transparent; border: 2px dashed #333; font-size: 20px; padding: 5px; color: #333; outline: none; min-width: 100px; }
-    /* 모달 스타일 생략 (이전과 동일) */
+    
+    /* 모달 스타일 */
     #imgModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
     #previewContainer { position: relative; max-width: 90%; max-height: 60%; border: 2px solid white; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #333; }
     #previewImg { max-width: 100%; max-height: 100%; object-fit: contain; }
     #modalControls { margin-top: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; align-items: center; background: white; padding: 20px; border-radius: 15px; }
     input[type=range] { width: 100%; } .modal-btns { display: flex; gap: 10px; width: 100%; } .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; } .btn-confirm { background: #007aff; color: white; } .btn-cancel { background: #eee; color: #333; }
+
+    /* ▼▼▼ [NEW] 채팅 로그 스타일 추가 ▼▼▼ */
+    #chat-log {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.6); /* 반투명 검은색 */
+      color: white;
+      padding: 15px;
+      overflow-y: auto; /* 내용 많으면 스크롤 */
+      z-index: 900; /* 캔버스보다 위에, 모달보단 아래 */
+      font-family: sans-serif;
+      backdrop-filter: blur(5px);
+      border-radius: 15px;
+      pointer-events: none; /* 클릭 통과 (그림 그리기 방해 안 되게) */
+    }
+    
+    /* 메시지 한 줄 */
+    .log-message {
+      margin-bottom: 8px;
+      font-size: 14px;
+      line-height: 1.4;
+      text-shadow: 1px 1px 2px black;
+      animation: fadeIn 0.3s ease-out; /* 부드럽게 등장 */
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* 🖥️ PC 화면: 오른쪽 사이드바 */
+    @media (min-width: 768px) {
+      #chat-log {
+        top: 20px;
+        right: 20px;
+        bottom: 100px; /* 툴바 위까지 */
+        width: 300px;
+        max-height: 80%;
+      }
+    }
+
+    /* 📱 모바일 화면: 상단 배너 */
+    @media (max-width: 767px) {
+      #chat-log {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        height: 120px; /* 높이 제한 */
+        font-size: 12px; /* 글자 조금 작게 */
+      }
+    }
   </style>
 </head>
 <body>
+  <div id="chat-log">
+    <div class="log-message" style="color: #ffff00;">🤖 시스템: AI 친구가 준비되었습니다!</div>
+  </div>
+
   <div id="viewport"><canvas id="myCanvas"></canvas></div>
   <input type="text" id="textInput" placeholder="입력 후 엔터">
   <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="openImageModal(this)">
-  
+   
   <div id="imgModal">
     <div id="previewContainer"><img id="previewImg" src=""></div>
     <div id="modalControls">
@@ -67,7 +123,7 @@
     <button class="tool-btn material-icons-round kakao-btn" onclick="shareKakao()">chat_bubble</button>
     <button class="tool-btn material-icons-round" onclick="saveImage()">save_alt</button>
     <button class="tool-btn material-icons-round" style="color:#ff3b30" onclick="clearAll()">delete</button>
-    <button onclick="askAI()">🤖 AI야 맞춰봐!</button>
+    <button class="tool-btn" style="width:auto; padding:0 10px; font-size:14px; font-weight:bold; color:#007aff;" onclick="askAI()">🤖 AI맞춰봐</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -91,18 +147,28 @@
     let scale = 1, panX = (window.innerWidth-VIRTUAL_WIDTH)/2, panY = (window.innerHeight-VIRTUAL_HEIGHT)/2;
     let isSpacePressed = false, isMousePanning = false, panStartMouse = null;
     let tempImgData = null;
-    let currentStrokeId = null; // [핵심] 현재 그리는 획의 고유 번호
+    let currentStrokeId = null;
 
     updateTransform();
     function updateTransform() { canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`; }
     function getPos(clientX, clientY) { return { x: (clientX - panX) / scale, y: (clientY - panY) / scale }; }
+
+    // ▼▼▼ [NEW] 채팅 로그 함수 추가 ▼▼▼
+    function addLog(text, color = 'white') {
+      const chatBox = document.getElementById('chat-log');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'log-message';
+      msgDiv.innerText = text;
+      msgDiv.style.color = color;
+      chatBox.appendChild(msgDiv);
+      chatBox.scrollTop = chatBox.scrollHeight; // 자동 스크롤
+    }
 
     function drawLine(x0, y0, x1, y1, style, emit) {
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
       ctx.strokeStyle = style.color; ctx.lineWidth = style.width; ctx.lineCap = 'round';
       ctx.globalCompositeOperation = style.mode === 'eraser' ? 'destination-out' : 'source-over';
       ctx.stroke(); ctx.closePath();
-      // strokeId도 같이 보냄
       if (emit) socket.emit('drawing', { x0, y0, x1, y1, color: style.color, width: style.width, mode: style.mode, strokeId: currentStrokeId });
     }
     
@@ -176,7 +242,7 @@
       else { 
         isDown = true; isDrawing = false; 
         const p = getPos(e.clientX, e.clientY); lastCenter = p; startPos = p; 
-        currentStrokeId = Date.now() + Math.random(); // [핵심] 누를 때마다 새로운 세트 번호 생성
+        currentStrokeId = Date.now() + Math.random(); 
       }
     });
     viewport.addEventListener('mousemove', (e) => {
@@ -202,7 +268,7 @@
       } else if (e.touches.length === 1) { 
         isDown = true; isDrawing = false; 
         const p = getPos(e.touches[0].clientX, e.touches[0].clientY); lastCenter = p; startPos = p;
-        currentStrokeId = Date.now() + Math.random(); // [핵심] 터치할 때도 세트 번호 생성
+        currentStrokeId = Date.now() + Math.random();
       }
     }, { passive: false });
     viewport.addEventListener('touchmove', (e) => {
@@ -247,20 +313,24 @@
     function shareKakao() { if (!Kakao.isInitialized()) { alert('키 오류'); return; } Kakao.Share.sendDefault({ objectType: 'feed', content: { title: '그림판', description: '접속!', imageUrl: '', link: { mobileWebUrl: location.href, webUrl: location.href } }, buttons: [{ title: '가기', link: { mobileWebUrl: location.href, webUrl: location.href } }] }); }
     function undoLast() { socket.emit('undo'); }
 
+    // ▼▼▼ [수정됨] AI 요청 함수 (alert 대신 로그 사용) ▼▼▼
     function askAI() {
-    // 1. 현재 캔버스를 이미지로 변환
-    const canvas = document.querySelector('canvas'); // 캔버스 태그 찾기
-    const image = canvas.toDataURL("image/png");
+      const canvas = document.querySelector('canvas');
+      const image = canvas.toDataURL("image/png");
+      
+      socket.emit('guess_request', image);
+      addLog("🤖 AI: 그림을 분석하고 있어요... (잠시만!)", "#aaa");
+    }
 
-    // 2. 서버로 전송
-    socket.emit('guess_request', image);
-    alert("AI가 고민 중입니다... 잠시만 기다리세요!");
-  }
+    // ▼▼▼ [수정됨] AI 응답 처리 (로그에 띄우기) ▼▼▼
+    socket.on('guess_result', (answer) => {
+      addLog("🤖 AI: " + answer, "#ffcc00"); // 노란색으로 강조
+    });
 
-  // 3. AI가 정답을 말하면 알림 띄우기
-  socket.on('guess_result', (answer) => {
-    alert("AI의 생각: " + answer);
-  });
+    // (혹시 나중에 심리테스트 기능 쓸 거면 이것도 추가)
+    socket.on('psychology_result', (result) => {
+      addLog("🧠 심리분석: " + result, "#ff99ff");
+    });
   </script>
 </body>
 </html>
