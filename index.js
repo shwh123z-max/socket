@@ -16,7 +16,7 @@ app.use(express.static('public'));
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
 
 // ★ 모델 설정: 아까 성공했던 가장 안정적인 모델 사용
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 // 그림 기록 저장소
 let history = [];
