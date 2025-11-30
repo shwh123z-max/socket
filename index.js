@@ -11,8 +11,8 @@ const io = require('socket.io')(http, {
 app.use(express.static('public'));
 
 // AI 설정 (Render에 숨겨둔 키를 가져옵니다)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);// (수정) "1.5-flash" 지우고 "gemini-pro" 라고 적으세요!
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 let history = [];
 
