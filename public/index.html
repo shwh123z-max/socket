@@ -313,24 +313,37 @@
     function shareKakao() { if (!Kakao.isInitialized()) { alert('키 오류'); return; } Kakao.Share.sendDefault({ objectType: 'feed', content: { title: '그림판', description: '접속!', imageUrl: '', link: { mobileWebUrl: location.href, webUrl: location.href } }, buttons: [{ title: '가기', link: { mobileWebUrl: location.href, webUrl: location.href } }] }); }
     function undoLast() { socket.emit('undo'); }
 
-    // ▼▼▼ [수정됨] AI 요청 함수 (alert 대신 로그 사용) ▼▼▼
-    function askAI() {
-      const canvas = document.querySelector('canvas');
-      const image = canvas.toDataURL("image/png");
-      
-      socket.emit('guess_request', image);
-      addLog("🤖 AI: 그림을 분석하고 있어요... (잠시만!)", "#aaa");
-    }
+    // ▼▼▼ [수정됨] 현재 보고 있는 화면만 잘라서 보내는 함수 ▼▼▼
+function askAI() {
+  // 1. 임시 캔버스 만들기 (현재 내 화면 크기만큼)
+  const tempCanvas = document.createElement('canvas');
+  const tCtx = tempCanvas.getContext('2d');
+  
+  tempCanvas.width = window.innerWidth;
+  tempCanvas.height = window.innerHeight;
 
-    // ▼▼▼ [수정됨] AI 응답 처리 (로그에 띄우기) ▼▼▼
-    socket.on('guess_result', (answer) => {
-      addLog("🤖 AI: " + answer, "#ffcc00"); // 노란색으로 강조
-    });
+  // 2. 배경을 흰색으로 칠하기 (투명하면 AI가 헷갈려함)
+  tCtx.fillStyle = "white";
+  tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-    // (혹시 나중에 심리테스트 기능 쓸 거면 이것도 추가)
-    socket.on('psychology_result', (result) => {
-      addLog("🧠 심리분석: " + result, "#ff99ff");
-    });
+  // 3. 현재 보고 있는 영역 계산하기 (수학 시간! 📐)
+  // 화면의 (0,0)이 캔버스의 어디에 해당하는지 역계산
+  const sx = -panX / scale;
+  const sy = -panY / scale;
+  const sWidth = window.innerWidth / scale;
+  const sHeight = window.innerHeight / scale;
+
+  // 4. 원본 캔버스에서 보고 있는 부분만 임시 캔버스로 복사
+  // drawImage(원본, 가져올X, 가져올Y, 가져올너비, 가져올높이, 그릴X, 그릴Y, 그릴너비, 그릴높이)
+  tCtx.drawImage(canvas, sx, sy, sWidth, sHeight, 0, 0, tempCanvas.width, tempCanvas.height);
+
+  // 5. 잘라낸 이미지 데이터 가져오기
+  const cropImage = tempCanvas.toDataURL("image/png");
+
+  // 6. 서버로 전송
+  socket.emit('guess_request', cropImage);
+  addLog("🤖 AI: 화면에 보이는 걸 분석 중이에요...", "#aaa");
+}
   </script>
 </body>
 </html>
