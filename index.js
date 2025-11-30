@@ -12,7 +12,7 @@ app.use(express.static('public'));
 
 // AI 설정 (Render에 숨겨둔 키를 가져옵니다)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);// gemini-pro-vision 지우고 아래 걸로 복구!
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 let history = [];
 
