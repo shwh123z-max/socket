@@ -67,6 +67,7 @@
     <button class="tool-btn material-icons-round kakao-btn" onclick="shareKakao()">chat_bubble</button>
     <button class="tool-btn material-icons-round" onclick="saveImage()">save_alt</button>
     <button class="tool-btn material-icons-round" style="color:#ff3b30" onclick="clearAll()">delete</button>
+    <button onclick="askAI()">🤖 AI야 맞춰봐!</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -245,6 +246,21 @@
     function saveImage() { const a=document.createElement('a'); a.download='sketch.png'; a.href=canvas.toDataURL(); a.click(); }
     function shareKakao() { if (!Kakao.isInitialized()) { alert('키 오류'); return; } Kakao.Share.sendDefault({ objectType: 'feed', content: { title: '그림판', description: '접속!', imageUrl: '', link: { mobileWebUrl: location.href, webUrl: location.href } }, buttons: [{ title: '가기', link: { mobileWebUrl: location.href, webUrl: location.href } }] }); }
     function undoLast() { socket.emit('undo'); }
+
+    function askAI() {
+    // 1. 현재 캔버스를 이미지로 변환
+    const canvas = document.querySelector('canvas'); // 캔버스 태그 찾기
+    const image = canvas.toDataURL("image/png");
+
+    // 2. 서버로 전송
+    socket.emit('guess_request', image);
+    alert("AI가 고민 중입니다... 잠시만 기다리세요!");
+  }
+
+  // 3. AI가 정답을 말하면 알림 띄우기
+  socket.on('guess_result', (answer) => {
+    alert("AI의 생각: " + answer);
+  });
   </script>
 </body>
 </html>
