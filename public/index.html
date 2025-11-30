@@ -39,7 +39,7 @@
     #modalControls { margin-top: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; align-items: center; background: white; padding: 20px; border-radius: 15px; }
     input[type=range] { width: 100%; } .modal-btns { display: flex; gap: 10px; width: 100%; } .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; } .btn-confirm { background: #007aff; color: white; } .btn-cancel { background: #eee; color: #333; }
 
-    /* 채팅 로그 스타일 */
+    /* ▼▼▼ [수정됨] 채팅 로그 스타일 ▼▼▼ */
     #chat-log {
       position: fixed;
       background: rgba(0, 0, 0, 0.6);
@@ -50,8 +50,16 @@
       font-family: sans-serif;
       backdrop-filter: blur(5px);
       border-radius: 15px;
-      pointer-events: none;
+      
+      /* ★ 여기가 핵심! auto로 바꿔서 터치/스크롤 가능하게 함 ★ */
+      pointer-events: auto; 
+      touch-action: pan-y; /* 모바일 스크롤 부드럽게 */
     }
+    
+    /* 스크롤바 디자인 (크롬/사파리) */
+    #chat-log::-webkit-scrollbar { width: 6px; }
+    #chat-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+
     .log-message {
       margin-bottom: 8px;
       font-size: 14px;
@@ -61,11 +69,11 @@
     }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* PC: 오른쪽 */
+    /* PC */
     @media (min-width: 768px) {
       #chat-log { top: 20px; right: 20px; bottom: 100px; width: 300px; max-height: 80%; }
     }
-    /* 모바일: 상단 */
+    /* 모바일 */
     @media (max-width: 767px) {
       #chat-log { top: 10px; left: 10px; right: 10px; height: 120px; font-size: 12px; }
     }
@@ -295,39 +303,33 @@
     function shareKakao() { if (!Kakao.isInitialized()) { alert('키 오류'); return; } Kakao.Share.sendDefault({ objectType: 'feed', content: { title: '그림판', description: '접속!', imageUrl: '', link: { mobileWebUrl: location.href, webUrl: location.href } }, buttons: [{ title: '가기', link: { mobileWebUrl: location.href, webUrl: location.href } }] }); }
     function undoLast() { socket.emit('undo'); }
 
-    // ▼▼▼ AI 화면 인식 요청 함수 (수정됨) ▼▼▼
+    // AI 요청 함수 (현재 화면 인식)
     function askAI() {
-      // 1. 임시 캔버스 생성 (현재 내 화면 크기만큼)
       const tempCanvas = document.createElement('canvas');
       const tCtx = tempCanvas.getContext('2d');
       tempCanvas.width = window.innerWidth;
       tempCanvas.height = window.innerHeight;
 
-      // 2. 배경 흰색 채우기
       tCtx.fillStyle = "white";
       tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-      // 3. 현재 보고 있는 부분만 잘라내기
       const sx = -panX / scale;
       const sy = -panY / scale;
       const sWidth = window.innerWidth / scale;
       const sHeight = window.innerHeight / scale;
 
-      // 원본 캔버스에서 해당 영역 복사
       tCtx.drawImage(canvas, sx, sy, sWidth, sHeight, 0, 0, tempCanvas.width, tempCanvas.height);
 
-      // 4. 잘라낸 이미지 전송
       const cropImage = tempCanvas.toDataURL("image/png");
       socket.emit('guess_request', cropImage);
-      addLog("🤖 AI: 화면에 보이는 걸 분석하고 있어요...", "#aaa");
+      addLog("🤖 AI: 화면을 보고 있어요... (잠시만!)", "#aaa");
     }
 
-    // AI 응답
+    // AI 응답 처리
     socket.on('guess_result', (answer) => {
       addLog("🤖 AI: " + answer, "#ffcc00");
     });
-    
-    // 심리테스트 결과
+
     socket.on('psychology_result', (result) => {
       addLog("🧠 심리분석: " + result, "#ff99ff");
     });
