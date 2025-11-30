@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>실시간 스케치북 + AI 채팅</title>
+  <title>실시간 스케치북 + AI</title>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"></script>
 
@@ -39,57 +39,41 @@
     #modalControls { margin-top: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; align-items: center; background: white; padding: 20px; border-radius: 15px; }
     input[type=range] { width: 100%; } .modal-btns { display: flex; gap: 10px; width: 100%; } .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; } .btn-confirm { background: #007aff; color: white; } .btn-cancel { background: #eee; color: #333; }
 
-    /* ▼▼▼ [NEW] 채팅 로그 스타일 추가 ▼▼▼ */
+    /* 채팅 로그 스타일 */
     #chat-log {
       position: fixed;
-      background: rgba(0, 0, 0, 0.6); /* 반투명 검은색 */
+      background: rgba(0, 0, 0, 0.6);
       color: white;
       padding: 15px;
-      overflow-y: auto; /* 내용 많으면 스크롤 */
-      z-index: 900; /* 캔버스보다 위에, 모달보단 아래 */
+      overflow-y: auto;
+      z-index: 900;
       font-family: sans-serif;
       backdrop-filter: blur(5px);
       border-radius: 15px;
-      pointer-events: none; /* 클릭 통과 (그림 그리기 방해 안 되게) */
+      pointer-events: none;
     }
-    
-    /* 메시지 한 줄 */
     .log-message {
       margin-bottom: 8px;
       font-size: 14px;
       line-height: 1.4;
       text-shadow: 1px 1px 2px black;
-      animation: fadeIn 0.3s ease-out; /* 부드럽게 등장 */
+      animation: fadeIn 0.3s ease-out;
     }
-
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* 🖥️ PC 화면: 오른쪽 사이드바 */
+    /* PC: 오른쪽 */
     @media (min-width: 768px) {
-      #chat-log {
-        top: 20px;
-        right: 20px;
-        bottom: 100px; /* 툴바 위까지 */
-        width: 300px;
-        max-height: 80%;
-      }
+      #chat-log { top: 20px; right: 20px; bottom: 100px; width: 300px; max-height: 80%; }
     }
-
-    /* 📱 모바일 화면: 상단 배너 */
+    /* 모바일: 상단 */
     @media (max-width: 767px) {
-      #chat-log {
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        height: 120px; /* 높이 제한 */
-        font-size: 12px; /* 글자 조금 작게 */
-      }
+      #chat-log { top: 10px; left: 10px; right: 10px; height: 120px; font-size: 12px; }
     }
   </style>
 </head>
 <body>
   <div id="chat-log">
-    <div class="log-message" style="color: #ffff00;">🤖 시스템: AI 친구가 준비되었습니다!</div>
+    <div class="log-message" style="color: #ffff00;">🤖 시스템: AI 스케치북 시작!</div>
   </div>
 
   <div id="viewport"><canvas id="myCanvas"></canvas></div>
@@ -153,7 +137,7 @@
     function updateTransform() { canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`; }
     function getPos(clientX, clientY) { return { x: (clientX - panX) / scale, y: (clientY - panY) / scale }; }
 
-    // ▼▼▼ [NEW] 채팅 로그 함수 추가 ▼▼▼
+    // 로그 함수
     function addLog(text, color = 'white') {
       const chatBox = document.getElementById('chat-log');
       const msgDiv = document.createElement('div');
@@ -161,7 +145,7 @@
       msgDiv.innerText = text;
       msgDiv.style.color = color;
       chatBox.appendChild(msgDiv);
-      chatBox.scrollTop = chatBox.scrollHeight; // 자동 스크롤
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function drawLine(x0, y0, x1, y1, style, emit) {
@@ -190,7 +174,7 @@
       if (emit) socket.emit('text', data);
     }
 
-    // 모달 및 이미지 로직
+    // 모달 및 이미지
     function openImageModal(input) {
       const file = input.files[0]; if (!file) return;
       const reader = new FileReader();
@@ -217,7 +201,7 @@
       img.src = tempImgData;
     }
 
-    // 텍스트 로직
+    // 텍스트 및 입력
     function handleCanvasClick(e) {
       if (current.mode !== 'text') return;
       if (textInput.style.display === 'block') { finishText(getPos(e.clientX, e.clientY)); return; }
@@ -232,7 +216,6 @@
       textInput.style.display = 'none'; textInput.value = ''; setMode('draw', document.querySelector('.color-btn.active'));
     }
 
-    // 입력 이벤트
     window.addEventListener('keydown', (e) => { if (e.code === 'Space') { isSpacePressed = true; viewport.style.cursor = 'grab'; } });
     window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isSpacePressed = false; viewport.style.cursor = 'crosshair'; isMousePanning = false; } });
 
@@ -304,7 +287,6 @@
     }));
     socket.on('clear', () => ctx.clearRect(0,0,canvas.width,canvas.height));
 
-    // UI 함수
     function setMode(m,b) { current.mode = m; document.querySelectorAll('.tool-btn').forEach(x=>x.classList.remove('active')); if(b) b.classList.add('active'); if(m==='eraser') document.querySelectorAll('.color-btn').forEach(x=>x.classList.remove('active')); if(m!=='text') textInput.style.display='none'; }
     function setColor(c,b) { current.color=c; setMode('draw',null); document.querySelectorAll('.color-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); document.getElementById('eraserBtn').classList.remove('active'); document.getElementById('textBtn').classList.remove('active'); }
     function toggleWidth(el) { current.width = (current.width===3)?10:3; el.style.fontWeight = (current.width===10)?'bold':'normal'; }
@@ -313,37 +295,42 @@
     function shareKakao() { if (!Kakao.isInitialized()) { alert('키 오류'); return; } Kakao.Share.sendDefault({ objectType: 'feed', content: { title: '그림판', description: '접속!', imageUrl: '', link: { mobileWebUrl: location.href, webUrl: location.href } }, buttons: [{ title: '가기', link: { mobileWebUrl: location.href, webUrl: location.href } }] }); }
     function undoLast() { socket.emit('undo'); }
 
-    // ▼▼▼ [수정됨] 현재 보고 있는 화면만 잘라서 보내는 함수 ▼▼▼
-function askAI() {
-  // 1. 임시 캔버스 만들기 (현재 내 화면 크기만큼)
-  const tempCanvas = document.createElement('canvas');
-  const tCtx = tempCanvas.getContext('2d');
-  
-  tempCanvas.width = window.innerWidth;
-  tempCanvas.height = window.innerHeight;
+    // ▼▼▼ AI 화면 인식 요청 함수 (수정됨) ▼▼▼
+    function askAI() {
+      // 1. 임시 캔버스 생성 (현재 내 화면 크기만큼)
+      const tempCanvas = document.createElement('canvas');
+      const tCtx = tempCanvas.getContext('2d');
+      tempCanvas.width = window.innerWidth;
+      tempCanvas.height = window.innerHeight;
 
-  // 2. 배경을 흰색으로 칠하기 (투명하면 AI가 헷갈려함)
-  tCtx.fillStyle = "white";
-  tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+      // 2. 배경 흰색 채우기
+      tCtx.fillStyle = "white";
+      tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-  // 3. 현재 보고 있는 영역 계산하기 (수학 시간! 📐)
-  // 화면의 (0,0)이 캔버스의 어디에 해당하는지 역계산
-  const sx = -panX / scale;
-  const sy = -panY / scale;
-  const sWidth = window.innerWidth / scale;
-  const sHeight = window.innerHeight / scale;
+      // 3. 현재 보고 있는 부분만 잘라내기
+      const sx = -panX / scale;
+      const sy = -panY / scale;
+      const sWidth = window.innerWidth / scale;
+      const sHeight = window.innerHeight / scale;
 
-  // 4. 원본 캔버스에서 보고 있는 부분만 임시 캔버스로 복사
-  // drawImage(원본, 가져올X, 가져올Y, 가져올너비, 가져올높이, 그릴X, 그릴Y, 그릴너비, 그릴높이)
-  tCtx.drawImage(canvas, sx, sy, sWidth, sHeight, 0, 0, tempCanvas.width, tempCanvas.height);
+      // 원본 캔버스에서 해당 영역 복사
+      tCtx.drawImage(canvas, sx, sy, sWidth, sHeight, 0, 0, tempCanvas.width, tempCanvas.height);
 
-  // 5. 잘라낸 이미지 데이터 가져오기
-  const cropImage = tempCanvas.toDataURL("image/png");
+      // 4. 잘라낸 이미지 전송
+      const cropImage = tempCanvas.toDataURL("image/png");
+      socket.emit('guess_request', cropImage);
+      addLog("🤖 AI: 화면에 보이는 걸 분석하고 있어요...", "#aaa");
+    }
 
-  // 6. 서버로 전송
-  socket.emit('guess_request', cropImage);
-  addLog("🤖 AI: 화면에 보이는 걸 분석 중이에요...", "#aaa");
-}
+    // AI 응답
+    socket.on('guess_result', (answer) => {
+      addLog("🤖 AI: " + answer, "#ffcc00");
+    });
+    
+    // 심리테스트 결과
+    socket.on('psychology_result', (result) => {
+      addLog("🧠 심리분석: " + result, "#ff99ff");
+    });
   </script>
 </body>
 </html>
