@@ -120,6 +120,22 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
+    
+    fetch('/api/config')
+    .then(response => response.json())
+    .then(data => {
+      if (data.kakaoKey) {
+        // 여기서 초기화!
+        if (!Kakao.isInitialized()) {
+          Kakao.init(data.kakaoKey);
+          console.log("카카오 초기화 성공! (JavaScript Key)");
+        }
+      } else {
+        console.error("서버에서 카카오 키를 못 가져왔어요.");
+      }
+    })
+    .catch(error => console.error("설정 로딩 실패:", error));
+    
     const socket = io();
     const viewport = document.getElementById('viewport');
     const canvas = document.getElementById('myCanvas');
