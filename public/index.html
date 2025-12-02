@@ -120,22 +120,8 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    
-    fetch('/api/config')
-    .then(response => response.json())
-    .then(data => {
-      if (data.kakaoKey) {
-        // 여기서 초기화!
-        if (!Kakao.isInitialized()) {
-          Kakao.init(data.kakaoKey);
-          console.log("카카오 초기화 성공! (JavaScript Key)");
-        }
-      } else {
-        console.error("서버에서 카카오 키를 못 가져왔어요.");
-      }
-    })
-    .catch(error => console.error("설정 로딩 실패:", error));
-    
+    try { Kakao.init(); } catch(e) {} 
+
     const socket = io();
     const viewport = document.getElementById('viewport');
     const canvas = document.getElementById('myCanvas');
@@ -338,28 +324,6 @@
       socket.emit('guess_request', cropImage);
       addLog("🤖 AI: 화면을 보고 있어요... (잠시만!)", "#aaa");
     }
-
-    // ... 위에는 express, socket 설정 등등 ...
-
-app.use(express.static('public'));
-
-// ▼▼▼ [추가] HTML에게 카카오 키를 전달하는 비밀 통로 ▼▼▼
-app.get('/api/config', (req, res) => {
-  res.json({ kakaoKey: process.env.KAKAO_KEY });
-});
-
-// 서버한테 키 달라고 요청하기
-fetch('/api/config')
-  .then(response => response.json())
-  .then(data => {
-    // 키를 받으면 그때 초기화!
-    if (!Kakao.isInitialized()) {
-      Kakao.init(data.kakaoKey);
-      console.log("카카오 키 연동 성공!");
-    }
-  })
-  .catch(error => console.error("키 로딩 실패:", error));
-
 
     // AI 응답 처리
     socket.on('guess_result', (answer) => {
