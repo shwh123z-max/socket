@@ -10,6 +10,9 @@ const io = require('socket.io')(http, {
 });
 
 app.use(express.static('public'));
+app.get('/api/config', (req, res) => {
+  res.json({ kakaoKey: process.env.KAKAO_KEY });
+});
 
 // 🤖 AI 설정
 // (Render에 저장된 GEMINI_KEY를 가져옵니다)
