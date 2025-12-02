@@ -21,18 +21,6 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
 // ★ 모델 설정: 아까 성공했던 가장 안정적인 모델 사용
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
-fetch('/api/config')
-  .then(response => response.json())
-  .then(data => {
-    // 키를 받으면 그때 초기화!
-    if (!Kakao.isInitialized()) {
-      Kakao.init(data.kakaoKey);
-      console.log("카카오 키 연동 성공!");
-    }
-  })
-  .catch(error => console.error("키 로딩 실패:", error));
-
-
 // 그림 기록 저장소
 let history = [];
 
